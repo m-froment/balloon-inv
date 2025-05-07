@@ -1,0 +1,5 @@
+.ipynb_checkpoints/
+__pycache__/
+ttplanet.cpython*.so
+chains_emcee*
+Figures/*

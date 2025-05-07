@@ -1,0 +1,66 @@
+!    -*- f90 -*-
+! Note: the context of this file is case sensitive.
+
+python module ttplanet ! in 
+    interface  ! in :ttplanet
+        subroutine ttloc(ho,dis,z,v0,azo,jmod,re,locgeo,typctl,nphas2,ttc,phcd,dtdd,ierr) ! in :ttplanet:ttplanet.f
+            real*8 intent(in) :: ho
+            real*8 intent(in) :: dis
+            real*8 dimension(101),intent(in) :: z
+            real*8 dimension(2,101),intent(in) :: v0
+            character*4 dimension(101) :: azo
+            integer intent(in) :: jmod
+            real*8 intent(in) :: re
+            logical intent(in) :: locgeo
+            integer intent(in) :: typctl
+            integer intent(out) :: nphas2
+            real*8 dimension(120),intent(out) :: ttc
+            character*8 dimension(120),intent(out) :: phcd
+            real*8 dimension(120),intent(out) :: dtdd
+            integer intent(out) :: ierr
+        end subroutine ttloc
+        subroutine reflex(ii,k,rr,tt,pa,fa,ttp,ppp,aa,del,vhq,pad,pi,v,g,v2,ndisc,ion,ib,iqq,phase) ! in :ttplanet:ttplanet.f
+            integer :: ii
+            integer :: k
+            real*8 dimension(2) :: rr
+            real*8 dimension(2) :: tt
+            real*8 dimension(2) :: pa
+            real*8 dimension(101) :: fa
+            real*8 dimension(50) :: ttp
+            real*8 dimension(50) :: ppp
+            real*8 :: aa
+            real*8 :: del
+            real*8 dimension(2) :: vhq
+            real*8 dimension(2) :: pad
+            real*8 :: pi
+            real*8 dimension(2,101) :: v
+            real*8 dimension(2,101) :: g
+            real*8 dimension(2,101) :: v2
+            integer dimension(101) :: ndisc
+            integer dimension(50) :: ion
+            integer :: ib
+            integer :: iqq
+            character*8 :: phase
+        end subroutine reflex
+        function phnum(phase) ! in :ttplanet:ttplanet.f
+            character*8 :: phase
+            integer :: phnum
+        end function phnum
+        subroutine efad(zsp,vsp,zfl,vfl,re) ! in :ttplanet:ttplanet.f
+            real*8 :: zsp
+            real*8 :: vsp
+            real*8 :: zfl
+            real*8 :: vfl
+            real*8 :: re
+        end subroutine efad
+        subroutine indexx(n,arr,indx) ! in :ttplanet:ttplanet.f
+            integer, optional,check(shape(arr, 0) == n),depend(arr) :: n=shape(arr, 0)
+            real*8 dimension(n) :: arr
+            integer dimension(n),depend(n) :: indx
+        end subroutine indexx
+    end interface 
+end python module ttplanet
+
+! This file was auto-generated with f2py (version:2.2.5).
+! See:
+! https://web.archive.org/web/20140822061353/http://cens.ioc.ee/projects/f2py2e
