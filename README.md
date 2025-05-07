@@ -27,6 +27,11 @@ conda env create -f inversion_environment.yml
 conda activate env_mcmc
 ```
 
+It will also be necessary to compile the Fortran code <code>ttplanet.f</code> with f2py, using command: 
+```
+bash make_ttplanet_f2py.sh
+```
+
 ## Structure of the code 
 
 A walk through a full inversion run (using the Strateole2 balloon data) is presented in the <code>test_inversion_flores_balloons.ipynb</code> notebook. This includes the processing of the balloon data, the extraction of picks, the formating of the data and preparation of the inversion, the inversion run and the final data processing as well as some figure outputs.  
