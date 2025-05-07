@@ -27,7 +27,7 @@ conda env create -f inversion_environment.yml
 conda activate env_mcmc
 ```
 
-It will also be necessary to compile the Fortran code <code>ttplanet.f</code> with f2py, using command: 
+It will also be necessary to compile the Fortran code <code>ttplanet.f</code> with f2py, using the following command: 
 ```
 bash make_ttplanet_f2py.sh
 ```
