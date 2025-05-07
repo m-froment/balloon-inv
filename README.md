@@ -21,8 +21,10 @@ Some important modules required for running the inversion are:
   <li>f2py</li>
 </ul>
 As well as mainy others. A complete Python environment is available in <code>inversion_environment.yml</code>. it can be installed with the following command: 
-    conda env create -f inversion_environment.yml
-    conda activate env_mcmc
+```
+conda env create -f inversion_environment.yml
+conda activate env_mcmc
+```
 
 ## Structure of the code 
 
