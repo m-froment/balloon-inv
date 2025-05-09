@@ -204,7 +204,7 @@ def get_flores_event(method="piecewise", period_window=500, do_plot=False):
 
 
 #############################################################################################################
-def generate_data(data_dir, initialize=False):
+def generate_data(data_dir, initialize=False, do_plot_ftan=False):
 
     if not os.path.exists(data_dir):
         os.makedirs(data_dir)
@@ -214,6 +214,7 @@ def generate_data(data_dir, initialize=False):
     if not os.path.isfile(data_dir + "data_flores_event.npy"):
         
         obspy_traces, event_info, stations_info, model_info, tit = get_flores_event()
+        do_plot_ftan=True
 
         ### Saving to text and npy files to gain time 
         np.save(data_dir + "data_flores_event", event_info)
@@ -274,7 +275,7 @@ def generate_data(data_dir, initialize=False):
         ### Periods for FTAN search 
         periods = np.logspace(np.log10(Tmin),np.log10(Tmax),100), 
         ### If we want to plot the phase picking 
-        plot=initialize,
+        plot=do_plot_ftan,
         ### Where to save data extraction results 
         data_dir=data_dir,
         ### The atmospheric model 

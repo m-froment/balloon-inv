@@ -1,5 +1,6 @@
 name: env_mcmc
 channels:
+  - anaconda
   - conda-forge
   - defaults
 dependencies:
@@ -50,6 +51,7 @@ dependencies:
   - ipywidgets=8.1.5=py313h06a4308_0
   - jedi=0.19.2=py313h06a4308_0
   - jinja2=3.1.6=py313h06a4308_0
+  - joblib=1.4.2=py313h06a4308_0
   - jpeg=9e=h5eee18b_3
   - json5=0.9.25=py313h06a4308_0
   - jsonschema=4.23.0=py313h06a4308_0
@@ -181,6 +183,7 @@ dependencies:
   - rfc3986-validator=0.1.1=py313h06a4308_0
   - rpds-py=0.22.3=py313h4aa5aa6_0
   - scikit-image=0.25.0=py313h6a678d5_0
+  - scikit-learn=1.6.1=py313h6a678d5_0
   - scipy=1.15.2=py313h86fcf2b_0
   - seaborn=0.13.2=hd8ed1ab_3
   - seaborn-base=0.13.2=pyhd8ed1ab_3
@@ -195,6 +198,7 @@ dependencies:
   - stack_data=0.2.0=pyhd3eb1b0_0
   - statsmodels=0.14.4=py313h5eee18b_0
   - terminado=0.17.1=py313h06a4308_0
+  - threadpoolctl=3.5.0=py313h7040dfc_0
   - tifffile=2025.2.18=py313h06a4308_0
   - tinycss2=1.4.0=py313h06a4308_0
   - tk=8.6.14=h39e8969_0

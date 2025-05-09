@@ -3846,7 +3846,7 @@ class MCMC_Model():
         ### COLORBAR PS 
         cbaxes1 = inset_axes(ax_ps, width="8%", height="30%", loc=3) 
         # cbps = fig.colorbar(hvp, cax=cbaxes, orientation='vertical', ticks=[0, vmaxp] )
-        cbps = fig.colorbar(hvac, cax=cbaxes1, orientation='vertical', ticks=[valminps, valmaxps] )
+        cbps = fig1.colorbar(hvac, cax=cbaxes1, orientation='vertical', ticks=[valminps, valmaxps] )
         cbps.ax.set_yticklabels(['0', '{:d}'.format(dminps)])
         cbps.set_label("Model/Mean Density", color="w")
         # cbps.set_label("Probability", color="w")
@@ -3934,7 +3934,7 @@ class MCMC_Model():
             ax.axvline(var_true[ia], linewidth=2, color=self.true_col, zorder=1)
             ### Best value 
             ax.axvline(var[ia][idx_best], linewidth=1.8, ls="--", color=self.max_col, zorder=10)
-            if do_MAP and wrs[ia] != []:
+            if do_MAP:
                 if Nmap>1:
                     for i in range(len(self.vs_map)):
                         # mapcol = colorskde[i]
@@ -4068,10 +4068,6 @@ class MCMC_Model():
             ax_ti.set_ylim(-ht.max(),ht.max())
             if ii<Nwaves-1:  
                 ax_ti.set_xticks([])   
-            ### Ensures t0 histogram has same height as S histogram
-            # ax_waves[ii].bar(x=t0bins[:-1], height=t0hist/t0hist.max()*shist.max(), align="edge",
-            #                     width = np.diff(t0bins),
-            #                     color=self.hist_col, alpha=self.hist_alpha, zorder=-1, edgecolor='w', linewidth=0.5    )
             ax_ti.axvline(t0_true, linewidth=1.5, ls="-.", color=self.true_col, zorder=2)
             ax_ti.axvline(t0s[-1], linewidth=1, ls="-", color=self.max_col, zorder=10)
             
@@ -4080,15 +4076,7 @@ class MCMC_Model():
             ### PLOT WAVEFORM-RELATED INFORMATION
             sphistmax = 1
             if self.DATA.data_vector[ii]["S_arrival"] != None:
-                ### OPTION 1: Show arrival expected from best model 
-                # true_S = compute_travel_time_SP(dist_true, source_depth_true, 
-                #                                     self.DATA.true_velocity_model, phase='s')
-                # ### We account for origin time and propagation time in air: 
-                # true_arr_S = t0_true + true_S + tair
-                # ### Chosen_S was already converted to an arrival time. 
-                # ax_waves[ii].axvline(true_arr_S, linewidth=1.5, color=self.true_col, zorder=2)#, label="True S")
-
-                ### OPTION 2: Show picked arrival 
+                ### Show picked arrival 
                 ax_waves[ii].axvline(self.DATA.data_vector[ii]["S_arrival"], linewidth=1.5, ls="--", color=self.true_col, zorder=2)
 
                 ### Histogram 
@@ -4099,15 +4087,7 @@ class MCMC_Model():
                 sphistmax = max(shist.max(), sphistmax)
 
             if self.DATA.data_vector[ii]["P_arrival"] != None:
-                ### OPTION 1: Show arrival expected from best model 
-                # true_P = compute_travel_time_SP(dist_true, source_depth_true, 
-                #                                     self.DATA.true_velocity_model, phase='p')
-                # ### We account for origin time and propagation time in air: 
-                # true_arr_P = t0_true + true_P + tair
-                # ### Chosen_S was already converted to an arrival time. 
-                # ax_waves[ii].axvline(true_arr_P, linewidth=1.5, color=self.true_col, zorder=2)#, label="True P")
-
-                ### OPTION 2: Show picked arrival 
+                ### Show picked arrival 
                 ax_waves[ii].axvline(self.DATA.data_vector[ii]["P_arrival"], linewidth=1.5, color=self.true_col, zorder=2)
 
                 ### Histogram 
