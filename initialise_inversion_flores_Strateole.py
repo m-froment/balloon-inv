@@ -210,6 +210,7 @@ def generate_data(data_dir, initialize=False):
         os.makedirs(data_dir)
 
     ### Get the Flores waveform data from external code 
+    ### Load event data 
     if not os.path.isfile(data_dir + "data_flores_event.npy"):
         
         obspy_traces, event_info, stations_info, model_info, tit = get_flores_event()
@@ -273,7 +274,7 @@ def generate_data(data_dir, initialize=False):
         ### Periods for FTAN search 
         periods = np.logspace(np.log10(Tmin),np.log10(Tmax),100), 
         ### If we want to plot the phase picking 
-        plot=False,#initialize,
+        plot=initialize,
         ### Where to save data extraction results 
         data_dir=data_dir,
         ### The atmospheric model 
