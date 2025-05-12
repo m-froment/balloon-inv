@@ -1,16 +1,17 @@
 c ----------------------------------------------------------------------
 c  
-c          Marouchka Froment
-c          NORSAR 
+c                            Authors
 c
-c          Code adapted from 
 c          Johannes Schweitzer
 c          NORSAR
 c
+c          Adaptation  for f2py by
+c          Marouchka Froment
+c          NORSAR 
 c          KJELLER, Norway
 c
-c  e-mail: johannes.schweitzer@norsar.no
-c  e-mail: marouchka.froment@norsar.no 
+c     e-mail: johannes.schweitzer@norsar.no
+c     e-mail: marouchka.froment@norsar.no 
 c
 c----------------------------------------------------------------------
 c
@@ -25,26 +26,17 @@ c
 c     developed from laufps.f
 c          see DOI: 10.2312/GFZ.NMSOP-2_PD_11.2
 c
-c
-c     Only the travel time calculation was kept 
-c     It calculates ray travel times, backazimuths, and slowness values.
-c
-c     All calculations are done for a spherical planet with arbitrary 
-c     radius, with travel times corrected for the ellipticity. 
+c     Only the travel time calculation for direct P, S waves was kept
+c     Calculations are done for a spherical planet of arbitrary radius
 c
 c----------------------------------------------------------------------
 c
-c               Program History
+c                        Program History
 c
 c     October 2024: Creation of a single program TTPLANET
 c
-c     Oct 2024: Note: when the source is exactly at the interface
-c               between two layers, the phase labelling doesn't work
-c               for head waves (Sn, Pn) 
-c
-c     April 2025: discovered a problem in this code with 
-c     Low Velocity Zones. Required updates. 
-c     FIRST TRUSTED VERSION FOR LVZ -- works
+c     April 2025: discovered a problem when velocity model includes
+c     Low Velocity Zones. Now corrected
 c
 c----------------------------------------------------------------------
 
@@ -55,7 +47,7 @@ c----------------------------------------------------------------------
      +                 ierr)
 
 c----------------------------------------------------------------------
-c     Here we give informations on the subroutine call
+c     DESCRIPTION OF INPUTS/OUTPUTS
 
 c     ho:      input, source depth (km)
 c     dis:     input, receiver distance (degrees)
@@ -74,8 +66,6 @@ c     dtdd:    output, ray parameters of onsets in [sec/deg]
 c     ierr:    output, error flag (0 or else)
 c----------------------------------------------------------------------
 
-c      implicit real*8 (a-h,o-z)
-c      implicit integer (i-n)
       IMPLICIT NONE 
 
       REAL*8      ho, dis
@@ -274,7 +264,7 @@ c     Finds if layer contains the source
 c     We will at first calculate P than S phases
 C     (k-loop)
 C
-c     MF: Loop for K=1 (P waves) and K=2 (S waves)
+c     Loop for K=1 (P waves) and K=2 (S waves)
 
       DO 810 K=1,2
 
@@ -318,7 +308,7 @@ c     here model with equal layering for P and S velocities is read
 c     now travel time calculations follow
 c
 
-c     MF: New loop on K=1 (P waves) or K=2 (S waves)
+c     New loop on K=1 (P waves) or K=2 (S waves)
 
       DO 7500 K=1,2
 
@@ -597,25 +587,17 @@ C
 
 c      MF: Attempt at removing SAVE statement 
 c      As it can break reproducibility in Python 
-c      SAVE
 
       iph=phnum(phase)
       L=II-1
 
-c      MF
-c      print *, ii, k 
-
          VMAX=V(K,IQQ)
-c     MF
-c      print *, VMAX
 
          DO  1000  I=1,L
          FA(I)=2.D0
          IF(I.LT.IQQ)  FA(I)=FA(I)-1.D0
          IF(V(K,I) .GT.VMAX)  VMAX=V(K,I)
          IF(V2(K,I).GT.VMAX)  VMAX=V2(K,I)
-c     MF
-c      print *, VMAX 
 1000     CONTINUE
 
       IBC=IB*30
@@ -723,10 +705,6 @@ ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       function phnum(phase)
 
-c      include 'phlist.h'
-c     MF: Replaced by copy of file phlist.h 
-c     if changing np, change also np in subroutine reflex(1)
-c
       parameter (np=50)
 
       character phlist(np)*8
@@ -738,10 +716,6 @@ c     ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       CHARACTER phase*8
 
       integer phnum
-
-c      MF: Attempt at removing SAVE statement 
-c      As it can break reproducibility in Python 
-c      SAVE
 
       phnum = 999
       do 5 i = 1,np
@@ -870,80 +844,3 @@ c j.s.  if(jstack.gt.NSTACK)pause 'NSTACK too small in indexx'
       goto 1
       END
 cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
-
-
-c
-c     input:
-c 
-c             ho      = source depth in km 
-c
-c             dis     = receiver distance in deg
-c
-c             typctl  = verbosity level
-c
-c    in common MODEL :
-c 
-c             v0(1,i) =  P velocity in layer i
-c             v0(2,i) =  S velocity in layer i
-c
-c             z(i)    =  depth of layer i
-c
-c             elatc   =  latitude  to get the right CRUST 1.0 model 
-c                        parameters
-c             elonc   =  longitude to get the right CRUST 1.0 model 
-c                        parameters
-c
-c             elat2   =  latitude  to get the right CRUST 1.0 model 
-c                        parameters at second modelled point
-c             elon2   =  longitude to get the right CRUST 1.0 model 
-c                        parameters at second modelled point
-c
-c             imo     <= 0
-c                     <= 2 reading of model from filloc
-c                 (   =  2 CRUST 1.0 only used for station
-c                          corrections  )
-c                     =  3 using model from CRUST 1.0
-c                     =  4 dito + CRUST 1.0 used for travel-time 
-c                          corrections
-c
-c             jmod    =  number of layers
-c
-c             filloc  =  filename for file with local velocity model
-c
-c             mtyp    =  CRUST 1.0 model type
-c
-c             locgeo  =  false/true : if 'true', higher density of
-c                        'rays' (IB) and smaller distances are used (DIS)
-c         common
-c     output 
-c
-c             nphas2  = number of found onsets at receiver distance
-c
-c             phcd    = array with names of found onsets
-c
-c             ttc     = travel times of onsets in [sec]
-c
-c             dtdd    = ray parameters of onsets in [sec/deg]
-c
-c             ierr    = 0     everything o.k.
-c                       else  some error occurred.
-c
-c    in common MODEL :
-c 
-c             v0(1,i) =  P velocity in layer i
-c             v0(2,i) =  S velocity in layer i
-c
-c             z(i)    =  depth of layer i
-c
-c             jmod    =  number of layers
-c
-c             azo(i)  =  Conrad/Moho indicator
-c
-c             rmax    =  maximum distance for which this model shall be
-c                        used (read in from model file).
-c
-c             zmax    =  maximum depth for which this model can be
-c                        used (read in from model file).
-c
-c
-c     INPUT PARAMETER TYPE 
