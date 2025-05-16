@@ -1,6 +1,6 @@
 # Bayesian inversion of a planet's interior structure using balloon pressure data
 
-Froment, M., Brissaud, Q., Näsholm, S. P. and Schweitzer, J. (2025) _Joint source and subsurface inversion using earthquake-generated infrasound recorded by balloons_
+Froment, M., Brissaud, Q., Näsholm, S. P. and Schweitzer, J. (2025)
 
 This suite of codes performs the inversion of one component seismograms/pressure data to simultaneously retrieve the seismic source location and the planet's 1D velocity  structure. A Bayesian inversion approach is used, implementing different Markov chain Monte Carlo (McMC) algorithms. The inverted data consists of arrival times of Rayleigh Waves, P and S waves, measured from different types of signals:  
 <ul>
