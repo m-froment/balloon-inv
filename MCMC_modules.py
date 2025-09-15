@@ -158,7 +158,7 @@ def compute_travel_time_SP(dist, source_depth, velocity_model, re=6371, phase='p
     ### CALL TO LAUFPS 
     nphas2,ttc, phs, _, _ = \
                     ttloc(source_depth, dist*360/(2*np.pi*re), z, v0, azo,
-                      jmod,re,locgeo,typctl)              
+                      jmod,re,locgeo,typctl)         
 
     if nphas2==0 or ttc[0]==0:
         # print("No phase")
@@ -168,30 +168,33 @@ def compute_travel_time_SP(dist, source_depth, velocity_model, re=6371, phase='p
             return(1e10)
     else:
         if phase=="ps":
-            ttcp = ttc[[aa==b'Pg      ' and ttc[ia]!=0 for ia, aa in enumerate(phs)]]
-            ttcs = ttc[[aa==b'Sg      ' and ttc[ia]!=0 for ia, aa in enumerate(phs)]]
+            ttcp = ttc[[aa.startswith(b'P') and ttc[ia]!=0 for ia, aa in enumerate(phs)]]
+            ttcs = ttc[[aa.startswith(b'S') and ttc[ia]!=0 for ia, aa in enumerate(phs)]]
             if len(ttcp)==0:
-                return(1e10, ttcs)
-            elif len(ttcs)==0:
-                return(ttcp, 1e10)
+                ttcp = 1e10
             else:
-                ### Return P, then S phase 
-                return(min(ttcp[:nphas2]),  min(ttcs[:nphas2]) ) 
+                ttcp = min(ttcp)
+            if len(ttcs)==0:
+                ttcs = 1e10
+            else:
+                ttcs = min(ttcs)
+            ### Return P, then S phase 
+            return(ttcp,  ttcs) 
         elif phase=="p":
-            ttcp = ttc[[aa==b'Pg      ' and ttc[ia]!=0 for ia, aa in enumerate(phs)]]
+            ttcp = ttc[[aa.startswith(b'P') and ttc[ia]!=0 for ia, aa in enumerate(phs)]]
             if len(ttcp)==0:
                 return(1e10)
             else:
                 ### Return P phase 
-                return( min(ttcp[:nphas2]) ) 
+                return( min(ttcp) ) 
         elif phase=="s":
             # print(a)
-            ttcs = ttc[[aa==b'Sg      ' and ttc[ia]!=0 for ia, aa in enumerate(phs)]]
+            ttcs = ttc[[aa.startswith(b'S') and ttc[ia]!=0 for ia, aa in enumerate(phs)]]
             if len(ttcs)==0:
                 return(1e10)
             else:
                 ### Return S phase 
-                return( min(ttcs[:nphas2]) )  
+                return( min(ttcs) )  
 
 
 ########################################################################################################
@@ -712,6 +715,7 @@ def log_prior(x, prior_inv, wr_order):
 
 
 ###################################################################################################################
+### Based on absolute travel times
 def log_likelihood(theta, wr_order, prior_lims, is_inverted, data_vector, std_vector, sta_lats, sta_lons, tprops_air, periods_RWs):
 
     ### Retrieve model parameters 
@@ -793,6 +797,226 @@ def log_likelihood(theta, wr_order, prior_lims, is_inverted, data_vector, std_ve
     return score, blob 
 
 
+###################################################################################################################
+### Based on absolute travel times and L1 norm (if using uncomment corresponding line in log_probability())
+def log_likelihood_L1(theta, wr_order, prior_lims, is_inverted, data_vector, std_vector, sta_lats, sta_lons, tprops_air, periods_RWs):
+
+    ### Retrieve model parameters 
+    t0, source_lat, source_lon, source_depth, vs, poisson_layers, h_layers, blob = get_model_from_inverted(theta, wr_order, prior_lims, is_inverted)
+
+    velocity_model = create_model(vs, poisson_layers, h_layers)
+    ### Dummy model 
+    # velocity_neat = velocity_model.copy()
+    
+    ### Initialize total log-likelihood 
+    score = 0.
+    # Load station location data and propagation time in air (zero for surface station)
+    for ii, (sta_lat, sta_lon, tair) in enumerate(zip(sta_lats, sta_lons, tprops_air)):
+        
+        ### Station-Event great circle distance in km 
+        sta_dist = gps2dist_azimuth(sta_lat, sta_lon, source_lat, source_lon)[0]/1e3 
+
+
+        ### If inverting using Rayleigh Waves:     
+        if not np.any(data_vector[ii]["RW_arrival"] == None) : 
+            periods_RW = periods_RWs[ii]
+            _, predicted_vg0_RW = compute_vg_n_layers(periods_RW, velocity_model, max_mode = 1,)
+            
+            #print("vg : ", predicted_vg0_RW)
+            if predicted_vg0_RW is None or predicted_vg0_RW[0].size < data_vector[ii]["RW_arrival"].size:
+                ### rejecting: no vg found
+                return -np.inf, blob 
+
+            ### Arrival time of Rayleigh Wave: 
+            # trw = t0 + (sta_dist + source_depth)/predicted_vg0_RW[0] + tair 
+            ### upward time ignored 
+            trw = t0 + (sta_dist)/predicted_vg0_RW[0] + tair 
+            ### Calculate log of L1 misfit - Laplace distribution
+            score_RW =  -np.sum( np.abs(trw - data_vector[ii]["RW_arrival"]) /std_vector[ii]["RW_error"] ) - np.sum(np.log(2*std_vector[ii]["RW_error"]))
+        else: 
+            score_RW = 0 
+
+        ### If inverting using both P and S waves: 
+        score_S = 0 
+        score_P = 0
+
+        ### If inverting using both P and S arrivals 
+        if data_vector[ii]["S_arrival"] != None and data_vector[ii]["P_arrival"] != None:
+            dtP, dtS = compute_travel_time_SP(sta_dist, source_depth, velocity_model.copy(), phase="ps")
+            if dtP >1e9 or dtS>1e9:
+                ### rejecting: no P found
+                return -np.inf, blob 
+            else:
+                score_S = - np.abs(t0 + dtS + tair -data_vector[ii]["S_arrival"])/std_vector[ii]["S_error"]  -np.log(2*std_vector[ii]["S_error"] )
+                score_P = - np.abs(t0 + dtP + tair -data_vector[ii]["P_arrival"])/std_vector[ii]["P_error"]  -np.log(2*std_vector[ii]["P_error"] )
+            
+
+        ### If inverting only using S waves: 
+        elif data_vector[ii]["S_arrival"] != None:
+            
+            ### Compute S wave travel time 
+            ### TODO: Correct ttplanet code ! 
+            ### So far, the travel time calculation doesn't work for a model with a LVZ, except if 
+            ### We run the tt calculation first with a similar model without a LVZ
+            ### Here I construct a dummy model to do just that. 
+            # if np.any(np.diff(velocity_neat[:,2])<0):
+            #     velocity_neat[:,2] = np.sort(velocity_neat[:,2])
+                # while (np.any(np.diff(velocity_neat[:,2])<0)):
+                #     alvz = np.where(np.diff(velocity_neat[:,2])<0)[0]
+                #     #print(alvz)
+                #     ### Remove LVZ in dummy model 
+                #     for ia in alvz:
+                #         velocity_neat[ia+1,2] = velocity_neat[ia,2]   
+                # dummy_dtS = compute_travel_time_SP(sta_dist, source_depth, velocity_neat.copy(), phase='s')
+            ### Now the one with LVZ should work 
+            dtS = compute_travel_time_SP(sta_dist, source_depth, velocity_model.copy(), phase="s")
+            ### Testing (very strange behavior)
+            # if np.any(np.diff(velocity_model[:,2])<0):
+            #     dtS_cake = compute_travel_time_SP_cake(sta_dist, source_depth, velocity_model.copy(), phase="s")
+            #     print("LVZ S: ", dtS, dtS_cake, abs(dtS-dtS_cake)) 
+            #     if abs(dtS-dtS_cake)>3 and (abs(dtS-dtS_cake)<9999):
+            #         # print("LVZ S: ", dummy_dtS, dtS, dtS_cake, abs(dtS-dtS_cake)) 
+            #         print(sta_dist, source_depth)
+            #         print(velocity_model)
+                    # print(velocity_neat)
+                    # quit()
+                    
+            if dtS >1e9:
+                ### rejecting: no S found
+                return -np.inf, blob 
+            else:
+                ### Calculate log of L1 misfit - Laplace distribution 
+                score_S = - np.abs(t0 + dtS + tair -data_vector[ii]["S_arrival"])/std_vector[ii]["S_error"]  -np.log(2*std_vector[ii]["S_error"] )
+                #print("tS : ", dtS)
+
+        ### If inverting only using P waves: 
+        elif data_vector[ii]["P_arrival"] != None:
+            
+            ### Compute P wave travel time 
+            # if np.any(np.diff(velocity_neat[:,1])<0):
+            #     velocity_neat[:,1] = np.sort(velocity_neat[:,1])
+                # while (np.any(np.diff(velocity_neat[:,1])<0)):
+                    # alvz = np.where(np.diff(velocity_neat[:,1])<0)[0]
+                    # # print(alvz)
+                    # ### Remove LVZ in dummy model 
+                    # for ia in alvz:
+                    #     velocity_neat[ia+1,1] = velocity_neat[ia,1]
+                # dummy_dtP = compute_travel_time_SP(sta_dist, source_depth, velocity_neat.copy(), phase='p')
+            ### Now the one with LVZ should work 
+            dtP = compute_travel_time_SP(sta_dist, source_depth, velocity_model.copy(), phase="p")
+            ### Testing (very strange behavior)
+            # if np.any(np.diff(velocity_model[:,1])<0):
+            #     dtP_cake = compute_travel_time_SP_cake(sta_dist, source_depth, velocity_model.copy(), phase="p")
+            #     print("LVZ P: ", dtP, dtP_cake, abs(dtP-dtP_cake)) 
+            #     if abs(dtP-dtP_cake)>3 and (abs(dtP-dtP_cake)<9999):
+            #         # print("LVZ P: ", dummy_dtP, dtP, dtP_cake, abs(dtP-dtP_cake)) 
+            #         print(sta_dist, source_depth)
+            #         print(velocity_model)
+                    # print(velocity_neat)
+                    # quit()
+
+            if dtP >1e9:
+                ### rejecting: no P found
+                return -np.inf, blob 
+            else:
+                ### Calculate log of L1 misfit - Laplace distribution
+                score_P = - np.abs(t0 + dtP + tair -data_vector[ii]["P_arrival"])/std_vector[ii]["P_error"]  -np.log(2*std_vector[ii]["P_error"] )
+                #print("tP : ", dtP)
+ 
+        # score += -weights[0]*((t0+predicted_arrival_S-data_vector[ii]["S_arrival"])/std_vector[ii][0])**2 
+        # score += -np.sum( weights[1:]*( (t0+(dist_balloon+source_depth)/predicted_vg0_RW[0] - data_vector[ii]["RW_arrival"]) /std_vector[ii]["RW_arrival"])**2 )
+
+        score += score_S + score_RW + score_P
+        
+        # print(score_S, score_P, score_RW)
+    # print("SCORE : ", score)
+
+    ### We also return the blob containing all parameters that are fixed or not inverted
+    return score, blob 
+
+
+###################################################################################################################
+### Based on travel-time difference (if using uncomment corresponding line in log_probability())
+def log_likelihood_b(theta, wr_order, prior_lims, is_inverted, data_vector, std_vector, sta_lats, sta_lons, tprops_air, periods_RWs):
+
+    ### Retrieve model parameters 
+    t0, source_lat, source_lon, source_depth, vs, poisson_layers, h_layers, blob = get_model_from_inverted(theta, wr_order, prior_lims, is_inverted)
+
+    velocity_model = create_model(vs, poisson_layers, h_layers)
+    
+    ### Initialize total log-likelihood 
+    score = 0.
+    ### Reference arrival time which will be used for all pairs 
+    tref_observed = data_vector[0]["P_arrival"]
+    stdref_observed = std_vector[0]["P_error"]
+    # Load station location data and propagation time in air (zero for surface station)
+    for ii, (sta_lat, sta_lon, tair) in enumerate(zip(sta_lats, sta_lons, tprops_air)):
+        
+        ### Station-Event great circle distance in km 
+        sta_dist = gps2dist_azimuth(sta_lat, sta_lon, source_lat, source_lon)[0]/1e3 
+
+        ### Calculate reference predicted tP: 
+        score_PP = 0
+        if ii == 0 :
+            dtPref = compute_travel_time_SP(sta_dist, source_depth, velocity_model.copy(), phase="p")
+            if dtPref >1e9:
+                return -np.inf, blob  
+        else: 
+            if data_vector[ii]["P_arrival"] != None:
+                dtP = compute_travel_time_SP(sta_dist, source_depth, velocity_model.copy(), phase="p")
+                if dtP >1e9:
+                    return -np.inf, blob  
+                else:
+                    tp_p = dtP - dtPref
+                    sigmap_p = np.sqrt(std_vector[ii]["P_error"]**2 + stdref_observed**2 )
+                    tp_p_observed = (data_vector[ii]["P_arrival"]-tref_observed)
+                    ### Calculate log of L2 misfit 
+                    score_PP = -1/2 * ( (tp_p - tp_p_observed)/ sigmap_p)**2 -1/2*np.log(2*np.pi*sigmap_p**2)
+                    
+            
+        ### If inverting using Rayleigh Waves:     
+        if not np.any(data_vector[ii]["RW_arrival"] == None) : 
+            periods_RW = periods_RWs[ii]
+            _, predicted_vg0_RW = compute_vg_n_layers(periods_RW, velocity_model, max_mode = 1,)
+            
+            #print("vg : ", predicted_vg0_RW)
+            if predicted_vg0_RW is None or predicted_vg0_RW[0].size < data_vector[ii]["RW_arrival"].size:
+                ### rejecting: no vg found
+                return -np.inf, blob 
+
+            ### Arrival time of Rayleigh Wave: 
+            tp_rw = sta_dist/predicted_vg0_RW[0] - dtPref
+            sigmap_rw = np.sqrt(std_vector[ii]["RW_error"]**2 + stdref_observed**2 )
+            tp_rw_observed = (data_vector[ii]["RW_arrival"] - tref_observed)
+            ### Calculate log of L2 misfit : tP-tRW
+            score_PRW = -1/2 * np.sum( ((tp_rw - tp_rw_observed) / sigmap_rw)**2 ) -1/2*np.sum(np.log(2*np.pi*sigmap_rw**2))
+        else: 
+            score_PRW = 0 
+
+        ### If inverting using both P and S waves: 
+        score_PS = 0 
+
+        ### If inverting only using S waves: 
+        if data_vector[ii]["S_arrival"] != None:
+            
+            dtS = compute_travel_time_SP(sta_dist, source_depth, velocity_model.copy(), phase="s")
+            if dtS >1e9:
+                ### rejecting: no S found
+                return -np.inf, blob 
+            else:
+                tp_s = dtS - dtPref
+                sigmap_s = np.sqrt(std_vector[ii]["S_error"]**2 + stdref_observed**2 )
+                tp_s_observed = (data_vector[ii]["S_arrival"] - tref_observed)
+                ### Calculate log of L2 misfit 
+                score_PS = -1/2 * ( (tp_s - tp_s_observed)/ sigmap_s)**2 -1/2*np.log(2*np.pi*sigmap_s**2)
+                #print("tS : ", dtS)
+
+        score += score_PP + score_PS + score_PRW 
+
+    ### We also return the blob containing all parameters that are fixed or not inverted
+    return score, blob 
+
+
 ########################################################################################################
 def log_probability(x, prior_lims, prior_inv, is_inverted, wr_order, args_MCMC):
     l_novinv = len(prior_lims)-len(prior_inv)
@@ -821,6 +1045,8 @@ def log_probability(x, prior_lims, prior_inv, is_inverted, wr_order, args_MCMC):
         else:
             raise ValueError("Connot define blobs for more than 8 variables")
     ll, blob = log_likelihood(x, wr_order, prior_lims, is_inverted, *args_MCMC)
+    # ll, blob = log_likelihood_b(x, wr_order, prior_lims, is_inverted, *args_MCMC)
+    # ll, blob = log_likelihood_L1(x, wr_order, prior_lims, is_inverted, *args_MCMC)
     if l_novinv == 0:
         return lp + ll
     elif l_novinv == 1: 
@@ -950,7 +1176,7 @@ class MCMC_data():
             for fi, ds in enumerate(files_to_save):
                 with open(self.data_dir + ds + "_pik", "wb") as fp:
                     pickle.dump(data_to_save[fi], fp)
-        
+
         ########################################################################################
         ### Recover the saved inversion data: 
         else:
@@ -987,7 +1213,7 @@ class MCMC_data():
         for ii in range(len(self.traces)):
 
             ### Load waveform and source-receiver distance, source depth (IF KNOWN). 
-            if self.key_traces == 0: ### Synthetic waveforms 
+            if self.key_traces == 0: ### Synthetic waveforms (not tested)
                 waveform = self.traces[ii]
             else:  ### Obspy waveforms 
                 waveform = self.traces[ii]
@@ -1626,8 +1852,9 @@ class MCMC_data():
             ### Plot hilbert transform
             # axs[0].plot(time, np.abs(hilbert(waveformb[0].data)), c="b", lw=1, label="Hilbert envelope")
             axs[0].set_ylim(1.1*amin, 1.1*amax) 
-            axs[0].set_title("Double-click to set P, then double-click before or after to set " + r"$\Delta$P" +". Same with S.\nEstimated distance: " + "d={:.0f} km".format(dist/1e3))
-
+            axs[0].set_title("Double-click to set P, then double-click before or after to set " + r"$\Delta$P" +". Same with S.\nStation: " +\
+                            #  waveform.stats.network + "." + waveform.stats.station + ", estimated source-receiver distance: " + "d={:.0f} km".format(dist/1e3))
+                             waveform.stats.station + "-" + waveform.stats.location +  ", estimated source-receiver distance: " + "d={:.0f} km".format(dist/1e3))
             ### DIFFERENT ENVELOPE FUNCTIONS 
             ### Some options filter out part of the signal 
             sig_filtered_low = waveform.copy()
@@ -1930,7 +2157,9 @@ class MCMC_data():
             waveformb.filter("bandpass", freqmin = min(freq_list), freqmax = max(freq_list), zerophase=True)
             ax0.plot(time, waveformb.data,  c='k', lw=1)
             ax0.set_xlim(time.min(), time.max())     
-            ax0.set_title("Double-click to set P, then double-click before or after\nto set DeltaP. Same with S.\nestimated dist: " + "d={:.0f} km".format(dist/1e3))
+            ax0.set_title("Double-click to set P, then double-click before or after to set DeltaP. Same with S. \nStation: " +\
+                            #  waveform.stats.network + "." + waveform.stats.station + ", estimated source-receiver distance: " + "d={:.0f} km".format(dist/1e3))
+                             waveform.stats.station + "-" + waveform.stats.location +  ", estimated source-receiver distance: " + "d={:.0f} km".format(dist/1e3))
 
             ################################################
             ### LOOP ON BANK 
@@ -2302,7 +2531,7 @@ class MCMC_Model():
         ### To start with the widest possible boundaries
         if self.method == "ptmcmc":
             ### Define the stepsize for the Gaussian generation of new models. 
-             self.stepsz = np.array([(pma -pmi)/self.proportion for pma, pmi in zip(start_max, start_min) ] )
+            self.stepsz = np.array([(pma -pmi)/self.proportion for pma, pmi in zip(start_max, start_min) ] )
 
         ### Final lists: Identify where each variable is inside the model parameter vector
         self.wr_order = [wr_ts, wr_Ls, wr_hs, wr_vs, wr_ps, wr_hl]
@@ -3197,7 +3426,7 @@ class MCMC_Model():
             mean_shift.fit(scaled_models)
             print("fit meanshift")
             
-            # Find the highest-density cluster
+            ### Find the highest-density cluster
             for i, cc in enumerate(mean_shift.cluster_centers_):
                 cc = cc*(minmax[:,1]-minmax[:,0]) + minmax[:,0]
                 ### normal 
@@ -3514,7 +3743,7 @@ class MCMC_Model():
         
         samples_depthlayer = samples.copy()
         map_model_depth = map_estimate.copy()
-        limsc_depth = [list(i) for i in self.prior_inv]
+        limsc_depth = [list(i) for i in self.prior_lims]
 
         ### Counter for non-inverted variables 
         cvar = 0
@@ -3539,7 +3768,7 @@ class MCMC_Model():
                 ###
                 if do_MAP:
                     depth_map_sum = depth_map_sum + map_model_depth[wr_hl[cinv]]
-                    map_model_depth[wrall_hl[cinv]] = depth_map_sum
+                    map_model_depth[wr_hl[cinv]] = depth_map_sum
                 cinv += 1
             else:
                 depth_sum = depth_sum + blobs["fixed_var_{:d}".format(cvar)]
@@ -3658,7 +3887,6 @@ class MCMC_Model():
         vs_true_interpolation = build_model_from_thicknesses(truth_velocity, self.depth_interpolation, 2)
         vp_true_interpolation = build_model_from_thicknesses(truth_velocity, self.depth_interpolation, 1)
         ps_true_interpolation = build_model_from_thicknesses(truth_velocity, self.depth_interpolation, 3)
-
         ####################################################################################################
         ### Load MAP 
         if do_MAP:
@@ -3788,7 +4016,10 @@ class MCMC_Model():
         rcParams.update({'font.size': fontsize})
         ### Axis limits for vp and vs profiles 
         vs_min, vs_max = min([self.prior_inv[i][0] for i in wr_vs]), min( max([self.prior_inv[i][1] for i in wr_vs]) , 1.2*self.vs_interpolation.max())
-        ps_min, ps_max = min([self.prior_inv[i][0] for i in wr_ps]), max([self.prior_inv[i][1] for i in wr_ps])
+        if np.any(self.is_inverted[4]):
+            ps_min, ps_max = min([self.prior_inv[i][0] for i in wr_ps]), max([self.prior_inv[i][1] for i in wr_ps])
+        if not np.all(self.is_inverted[4]):
+            ps_min, ps_max = 0.1, 0.4
         vp_min, vp_max = vp_from_vs(vs_min, ps_min), min(vp_from_vs(vs_max, ps_max), 1.2*self.vp_interpolation.max())
         if preserve_aspect:
             aspect_ratio = (vp_max-vp_min)/(vs_max-vs_min)
@@ -3822,7 +4053,7 @@ class MCMC_Model():
         hvac, valminps, valmaxps = plot_subsurface(ax_ps, self.ps_interpolation, self.depth_interpolation_all, self.depth_interpolation.size, 
                                                             ps_min, ps_max, depth_max, self.dens_cmap, self.bgcol, dmin= dminps)
         if do_truth:
-            ax_ps.plot(ps_true_interpolation, self.depth_interpolation, color=self.true_coldens, linewidth=3, zorder=10, label="True")
+            ax_ps.plot(ps_true_interpolation, self.depth_interpolation, color=self.true_coldens, linewidth=3, zorder=10, label="True")#"11sta")#
         if do_ML:
             ax_ps.plot(profile_ps, depth_best, color=self.max_coldens, linewidth=2, zorder=1, label="Best")
         if do_MAP:
@@ -4594,6 +4825,7 @@ class MCMC_Model():
 
         Nparam =  self.flat_samples.shape[1]
         truth_location = self.DATA.truth_location
+        truth_velocity = self.DATA.truth_velocity
 
         ####################################################################################################
         ### Load true solution
