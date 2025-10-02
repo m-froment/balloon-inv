@@ -2,6 +2,9 @@
 
 Froment, M., Brissaud, Q., Näsholm, S. P. and Schweitzer, J. (2025)
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.17251336.svg)](https://doi.org/10.5281/zenodo.17251336)
+
+
 This suite of codes performs the inversion of one component seismograms/pressure data to simultaneously retrieve the seismic source location and the planet's 1D velocity  structure. A Bayesian inversion approach is used, implementing different Markov chain Monte Carlo (McMC) algorithms. The inverted data consists of arrival times of Rayleigh Waves, P and S waves, measured from different types of signals:  
 <ul>
   <li>Seismograms (seismic stations)</li>
